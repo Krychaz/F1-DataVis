@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <title></title>
+    
+    <script src="https://d3js.org/d3.v5.min.js"></script>
+    <script src="https://d3js.org/d3-geo-projection.v2.min.js"></script> 
+    
+  
+    <title>F1 Champions Around the World</title>
+
+</head>
+
+
+<body>
+    <h1>F1 Champions Around the World</h1>
+    
+    <div id="TeamDropdown">Team:</div>
+    <!-- append visualization svg to this div-->
+    <div id="choropleth">
+    </div>
+    <script>
+    
+    let width = 1000
+      let height = 800
+      let transitionTime = 1000
+      let myProjection = d3.geoMercator().translate([width/2, height/2]).scale(150).center([0,40]);
+      let pathGenerator = d3.geoPath().projection(myProjection)
+
+
+      let mapData
+      let ChampionsData
+      let selectedTeam = 'All'
+
+      Promise.all([
+        d3.json('world_countries.json'),
+        d3.csv('F1-Champions.csv'),
+      ]).then(function(d) {
+        ready(d)
+        createMapAndLegend(ChampionsData, selectedTeam)
+
+        
+      })
+        
+        // this function should be called once the data from files have been read
+        // world: topojson from world_countries.json
+        // TeamData: data from F1-Champions.csv
+        
+    function ready(data) {
+        mapData = data[0]
+        ChampionsData = data[1]
+        dataset = d3.nest().key(function(d) { 
+                                return d.Team;
+                            }).entries(ChampionsData)
+
+        function mydropDown(data) {
+
+          var dropDown = d3.select("#TeamDropdown")
+            .append("select")
+            .attr("class", "selection")
+            .attr("name", "country-list");
+          
+          d3.select("select.selection").append("option")
+            .attr("value",'All')
+            .text("All")
+            d3.select("select.selection") .property('value', 'All')
+          var options = dropDown.selectAll("option")
+            .data(data)
+            .enter()
+            .append("option");
+          options.text(function(d) {
+              return d.key;
+            })
+            .attr("value", function(d) {
+              return d.values;
+            })
+
+          }
+       
+          mydropDown(dataset);
+          d3.select("select")
+            .on("change",function(d){
+                    selectedTeam =  this.options[this.selectedIndex].text
+                    createMapAndLegend(ChampionsData, selectedTeam)
+})
+
+        d3.select('div#choropleth')
+          .style('width', width + 'px')
+          .style('height', height + 'px')
+          .append('svg')
+          .attr('width', width)
+          .attr('height', height)
+          .attr('id', 'countries')
+          .selectAll('path')
+          .data(mapData.features)
+          .enter()
+          .append('path')
+          .attr('d', pathGenerator).attr("stroke" , 'black').append("title")
+            .text("")
+            .on('mouseover');
+
+        }
+
+        // this function should create a Choropleth and legend using the world and TeamData arguments for a selectedTeam
+        // also use this function to update Choropleth and legend when a different Team is selected from the dropdown
+        function createMapAndLegend(ChampionsData, selectedTeam){ 
+         
+        d3.selectAll('div#choropleth svg g text').remove() 
+        if(selectedTeam != 'All'){d2 = ChampionsData.filter(singleTeam => singleTeam["Team"] == selectedTeam)}
+        else  {d2 = ChampionsData}
+    
+        console.log(d2.length)
+
+        var groupedData = d3.nest()
+            .key(function (d) { return d.Country; })
+            .entries(d2);
+
+        CountryText = {}
+        groupedData.forEach(element => {
+          tooltipText =  "Country: "+element.key+"\n"
+          element.values.forEach(d =>{
+          tooltipText = tooltipText +"Team: "+d.Team+ "\n" + "Driver: " + d.Driver +"\n"+ "Year: " + d.Year +"\n"+"\n"
+          })
+          CountryText[element.key] = tooltipText
+        });
+        NumberOfWinners={}
+        for (i in d2) {
+          NumberOfWinners[d2[i].Country] = d2.length
+        }
+        d3.selectAll('div#choropleth svg path')
+          .transition()
+          .duration(transitionTime)
+          .attr('fill', function(d){
+            if(NumberOfWinners[d.properties.name]!=undefined)return 'red'
+            else return 'white'
+          } )
+        d3.selectAll('div#choropleth svg title')
+            .text(function(d) {if (CountryText[d.properties.name]!=undefined)return CountryText[d.properties.name]
+              else return d.properties.name
+            })
+            .on('mouseover');        
+        }
+    </script>
+
+</body>
+
+</html>
